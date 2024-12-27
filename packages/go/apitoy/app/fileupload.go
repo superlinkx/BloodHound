@@ -8,9 +8,7 @@ import (
 	"io"
 
 	"github.com/specterops/bloodhound/log"
-	appModel "github.com/specterops/bloodhound/packages/go/apitoy/model"
-	"github.com/specterops/bloodhound/src/model"
-	"github.com/specterops/bloodhound/src/model/ingest"
+	"github.com/specterops/bloodhound/packages/go/apitoy/model"
 )
 
 var (
@@ -20,7 +18,7 @@ var (
 
 // IngestFile ingests a given file in the form of an io.ReadCloser. It also requires a valid context, requestID, jobID, and fileType.
 func (s BHApp) IngestFile(ctx context.Context, requestID string, jobID int, fileType model.FileType, content io.ReadCloser) error {
-	var validationStrategy appModel.FileValidator
+	var validationStrategy model.FileValidator
 
 	switch fileType {
 	case model.FileTypeJson:
@@ -28,16 +26,14 @@ func (s BHApp) IngestFile(ctx context.Context, requestID string, jobID int, file
 	case model.FileTypeZip:
 		validationStrategy = writeAndValidateZip
 	default:
-		return ErrInvalidFile
+		return model.ErrInvalidFile
 	}
 
-	if fileUploadJob, err := s.dbAdapter.GetFileUploadJobByID(ctx, jobID); err != nil {
-		return err
-	} else if tempFile, err := s.fileAdapter.SaveIngestFile(content, validationStrategy); err != nil {
+	if tempFile, err := s.fileAdapter.SaveIngestFile(content, validationStrategy); err != nil {
 		return err
 	} else if _, err := s.dbAdapter.CreateIngestTask(ctx, tempFile, fileType, requestID, jobID); err != nil {
 		return err
-	} else if err := s.dbAdapter.TouchFileUploadJobLastIngest(ctx, fileUploadJob); err != nil {
+	} else if err := s.dbAdapter.TouchFileUploadJobLastIngest(ctx, jobID); err != nil {
 		return err
 	} else {
 		return nil
@@ -48,33 +44,33 @@ var zipMagicBytes = []byte{0x50, 0x4b, 0x03, 0x04}
 
 // validateMetaTag ensures that the correct tags are present in a json file for data model.
 // If readToEnd is set to true, the stream will read to the end of the file (needed for TeeReader)
-func validateMetaTag(reader io.Reader, readToEnd bool) (ingest.Metadata, error) {
+func validateMetaTag(reader io.Reader, readToEnd bool) (model.Metadata, error) {
 	var (
 		depth            = 0
 		decoder          = json.NewDecoder(reader)
 		dataTagFound     = false
 		dataTagValidated = false
 		metaTagFound     = false
-		meta             ingest.Metadata
+		meta             model.Metadata
 	)
 
 	for {
 		if token, err := decoder.Token(); err != nil {
 			if errors.Is(err, io.EOF) {
 				if !metaTagFound && !dataTagFound {
-					return ingest.Metadata{}, ingest.ErrNoTagFound
+					return model.Metadata{}, model.ErrNoTagFound
 				} else if !dataTagFound {
-					return ingest.Metadata{}, ingest.ErrDataTagNotFound
+					return model.Metadata{}, model.ErrDataTagNotFound
 				} else {
-					return ingest.Metadata{}, ingest.ErrMetaTagNotFound
+					return model.Metadata{}, model.ErrMetaTagNotFound
 				}
 			} else {
-				return ingest.Metadata{}, ErrInvalidJSONFile
+				return model.Metadata{}, model.ErrInvalidJSONFile
 			}
 		} else {
 			//Validate that our data tag is actually opening correctly
 			if dataTagFound && !dataTagValidated {
-				if typed, ok := token.(json.Delim); ok && typed == ingest.DelimOpenSquareBracket {
+				if typed, ok := token.(json.Delim); ok && typed == model.DelimOpenSquareBracket {
 					dataTagValidated = true
 				} else {
 					dataTagFound = false
@@ -83,9 +79,9 @@ func validateMetaTag(reader io.Reader, readToEnd bool) (ingest.Metadata, error) 
 			switch typed := token.(type) {
 			case json.Delim:
 				switch typed {
-				case ingest.DelimCloseBracket, ingest.DelimCloseSquareBracket:
+				case model.DelimCloseBracket, model.DelimCloseSquareBracket:
 					depth--
-				case ingest.DelimOpenBracket, ingest.DelimOpenSquareBracket:
+				case model.DelimOpenBracket, model.DelimOpenSquareBracket:
 					depth++
 				}
 			case string:
@@ -110,7 +106,7 @@ func validateMetaTag(reader io.Reader, readToEnd bool) (ingest.Metadata, error) 
 
 	if readToEnd {
 		if _, err := io.Copy(io.Discard, reader); err != nil {
-			return ingest.Metadata{}, err
+			return model.Metadata{}, err
 		}
 	}
 
@@ -122,11 +118,11 @@ func validateZipFile(reader io.Reader) error {
 	if readBytes, err := reader.Read(bytes); err != nil {
 		return err
 	} else if readBytes < 4 {
-		return ingest.ErrInvalidZipFile
+		return model.ErrInvalidZipFile
 	} else {
 		for i := 0; i < 4; i++ {
 			if bytes[i] != zipMagicBytes[i] {
-				return ingest.ErrInvalidZipFile
+				return model.ErrInvalidZipFile
 			}
 		}
 

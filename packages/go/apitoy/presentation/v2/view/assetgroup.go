@@ -3,9 +3,8 @@ package view
 import (
 	"errors"
 
-	appModel "github.com/specterops/bloodhound/packages/go/apitoy/model"
+	"github.com/specterops/bloodhound/packages/go/apitoy/model"
 	"github.com/specterops/bloodhound/slicesext"
-	"github.com/specterops/bloodhound/src/model"
 )
 
 var ErrNotSortableOnColumn = errors.New("not sortable on column")
@@ -67,16 +66,16 @@ func AssetGroupsSortableColumns() []string {
 	return []string{"name", "tag", "member_count"}
 }
 
-func AssetGroupsFilters() appModel.ValidFilters {
-	return appModel.ValidFilters{
-		"name":         {appModel.Equals, appModel.NotEquals},
-		"tag":          {appModel.Equals, appModel.NotEquals},
-		"system_group": {appModel.Equals, appModel.NotEquals},
-		"member_count": {appModel.Equals, appModel.GreaterThan, appModel.GreaterThanOrEquals, appModel.LessThan, appModel.LessThanOrEquals, appModel.NotEquals},
-		"id":           {appModel.Equals, appModel.GreaterThan, appModel.GreaterThanOrEquals, appModel.LessThan, appModel.LessThanOrEquals, appModel.NotEquals},
-		"created_at":   {appModel.Equals, appModel.GreaterThan, appModel.GreaterThanOrEquals, appModel.LessThan, appModel.LessThanOrEquals, appModel.NotEquals},
-		"updated_at":   {appModel.Equals, appModel.GreaterThan, appModel.GreaterThanOrEquals, appModel.LessThan, appModel.LessThanOrEquals, appModel.NotEquals},
-		"deleted_at":   {appModel.Equals, appModel.GreaterThan, appModel.GreaterThanOrEquals, appModel.LessThan, appModel.LessThanOrEquals, appModel.NotEquals},
+func AssetGroupsFilters() model.ValidFilters {
+	return model.ValidFilters{
+		"name":         {model.Equals, model.NotEquals},
+		"tag":          {model.Equals, model.NotEquals},
+		"system_group": {model.Equals, model.NotEquals},
+		"member_count": {model.Equals, model.GreaterThan, model.GreaterThanOrEquals, model.LessThan, model.LessThanOrEquals, model.NotEquals},
+		"id":           {model.Equals, model.GreaterThan, model.GreaterThanOrEquals, model.LessThan, model.LessThanOrEquals, model.NotEquals},
+		"created_at":   {model.Equals, model.GreaterThan, model.GreaterThanOrEquals, model.LessThan, model.LessThanOrEquals, model.NotEquals},
+		"updated_at":   {model.Equals, model.GreaterThan, model.GreaterThanOrEquals, model.LessThan, model.LessThanOrEquals, model.NotEquals},
+		"deleted_at":   {model.Equals, model.GreaterThan, model.GreaterThanOrEquals, model.LessThan, model.LessThanOrEquals, model.NotEquals},
 	}
 }
 
