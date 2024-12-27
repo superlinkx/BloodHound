@@ -1,7 +1,6 @@
 package view
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -17,9 +16,9 @@ var filterRegex = regexp.MustCompile(`([~\w]+):([\w\--_ ]+)`)
 
 // Basic is a struct which includes the following basic fields: CreatedAt, UpdatedAt, DeletedAt.
 type Basic struct {
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
-	DeletedAt sql.NullTime `json:"deleted_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	DeletedAt time.Time `json:"deleted_at"`
 }
 
 // Unique is a struct is a struct which includes the following basic fields: ID, CreatedAt, UpdatedAt, DeletedAt.
@@ -151,13 +150,20 @@ func IgnoreFilters() []string {
 func convertToSerial(serial model.Serial) Serial {
 	return Serial{
 		ID:    serial.ID,
-		Basic: Basic(serial.Basic),
+		Basic: convertToBasic(serial.Basic),
 	}
 }
 
 func convertToBigSerial(bigSerial model.BigSerial) BigSerial {
 	return BigSerial{
 		ID:    bigSerial.ID,
-		Basic: Basic(bigSerial.Basic),
+		Basic: convertToBasic(bigSerial.Basic),
+	}
+}
+
+func convertToBasic(basic model.Basic) Basic {
+	return Basic{
+		CreatedAt: basic.CreatedAt,
+		UpdatedAt: basic.UpdatedAt,
 	}
 }

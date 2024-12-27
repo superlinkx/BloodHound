@@ -5,21 +5,22 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"os"
-	"time"
 
 	"github.com/specterops/bloodhound/log"
-	"github.com/specterops/bloodhound/src/database"
-	"github.com/specterops/bloodhound/src/database/types/null"
+	appModel "github.com/specterops/bloodhound/packages/go/apitoy/model"
 	"github.com/specterops/bloodhound/src/model"
 	"github.com/specterops/bloodhound/src/model/ingest"
 )
 
+var (
+	ErrInvalidFile     = errors.New("file is invalid")
+	ErrInvalidJSONFile = errors.New("file is not valid JSON")
+)
+
 // IngestFile ingests a given file in the form of an io.ReadCloser. It also requires a valid context, requestID, jobID, and fileType.
 func (s BHApp) IngestFile(ctx context.Context, requestID string, jobID int, fileType model.FileType, content io.ReadCloser) error {
-	var validationStrategy fileValidator
+	var validationStrategy appModel.FileValidator
 
 	switch fileType {
 	case model.FileTypeJson:
@@ -27,82 +28,25 @@ func (s BHApp) IngestFile(ctx context.Context, requestID string, jobID int, file
 	case model.FileTypeZip:
 		validationStrategy = writeAndValidateZip
 	default:
-		return ErrFileValidation
+		return ErrInvalidFile
 	}
 
-	if fileUploadJob, err := getFileUploadJobByID(ctx, s.db, jobID); err != nil {
+	if fileUploadJob, err := s.dbAdapter.GetFileUploadJobByID(ctx, jobID); err != nil {
 		return err
-	} else if tempFile, err := saveIngestFile(s.cfg.TempDirectory(), content, validationStrategy); err != nil {
+	} else if tempFile, err := s.fileAdapter.SaveIngestFile(content, validationStrategy); err != nil {
 		return err
-	} else if _, err := createIngestTask(ctx, s.db, tempFile, fileType, requestID, jobID); err != nil {
+	} else if _, err := s.dbAdapter.CreateIngestTask(ctx, tempFile, fileType, requestID, jobID); err != nil {
 		return err
-	} else if err := touchFileUploadJobLastIngest(ctx, s.db, fileUploadJob); err != nil {
+	} else if err := s.dbAdapter.TouchFileUploadJobLastIngest(ctx, fileUploadJob); err != nil {
 		return err
 	} else {
 		return nil
 	}
 }
-
-func getFileUploadJobByID(ctx context.Context, db database.Database, jobID int) (model.FileUploadJob, error) {
-	if job, err := db.GetFileUploadJob(ctx, int64(jobID)); errors.Is(err, database.ErrNotFound) {
-		return job, fmt.Errorf("get file upload job by id: %w: %v", ErrNotFound, err)
-	} else if err != nil {
-		return job, fmt.Errorf("get file upload job by id: %w: %v", ErrGenericDatabase, err)
-	} else {
-		return job, nil
-	}
-}
-
-func createIngestTask(ctx context.Context, db database.Database, filename string, fileType model.FileType, requestID string, jobID int) (model.IngestTask, error) {
-	newIngestTask := model.IngestTask{
-		FileName:    filename,
-		RequestGUID: requestID,
-		TaskID:      null.Int64From(int64(jobID)),
-		FileType:    fileType,
-	}
-
-	if task, err := db.CreateIngestTask(ctx, newIngestTask); err != nil {
-		return task, fmt.Errorf("create ingest task: %w: %v", ErrGenericDatabase, err)
-	} else {
-		return task, nil
-	}
-}
-
-func touchFileUploadJobLastIngest(ctx context.Context, db database.Database, fileUploadJob model.FileUploadJob) error {
-	fileUploadJob.LastIngest = time.Now().UTC()
-	if err := db.UpdateFileUploadJob(ctx, fileUploadJob); err != nil {
-		return fmt.Errorf("touch last ingest: %w: %v", ErrGenericDatabase, err)
-	} else {
-		return nil
-	}
-}
-
-func saveIngestFile(tempDir string, body io.ReadCloser, validationStrategy fileValidator) (string, error) {
-	tempFile, err := os.CreateTemp(tempDir, "bh")
-	if err != nil {
-		return "", fmt.Errorf("creating ingest file: %w: %v", ErrGeneralApplication, err)
-	}
-
-	if err := validationStrategy(body, tempFile); err != nil {
-		if err := tempFile.Close(); err != nil {
-			log.Errorf("Error closing temp file %s with failed validation: %v", tempFile.Name(), err)
-		} else if err := os.Remove(tempFile.Name()); err != nil {
-			log.Errorf("Error deleting temp file %s: %v", tempFile.Name(), err)
-		}
-		return tempFile.Name(), fmt.Errorf("saving ingest file: %w: %v", ErrFileValidation, err)
-	} else {
-		if err := tempFile.Close(); err != nil {
-			log.Errorf("Error closing temp file with successful validation %s: %v", tempFile.Name(), err)
-		}
-		return tempFile.Name(), nil
-	}
-}
-
-type fileValidator func(src io.Reader, dst io.Writer) error
 
 var zipMagicBytes = []byte{0x50, 0x4b, 0x03, 0x04}
 
-// validateMetaTag ensures that the correct tags are present in a json file for data ingest.
+// validateMetaTag ensures that the correct tags are present in a json file for data model.
 // If readToEnd is set to true, the stream will read to the end of the file (needed for TeeReader)
 func validateMetaTag(reader io.Reader, readToEnd bool) (ingest.Metadata, error) {
 	var (
@@ -125,7 +69,7 @@ func validateMetaTag(reader io.Reader, readToEnd bool) (ingest.Metadata, error) 
 					return ingest.Metadata{}, ingest.ErrMetaTagNotFound
 				}
 			} else {
-				return ingest.Metadata{}, ErrInvalidJSON
+				return ingest.Metadata{}, ErrInvalidJSONFile
 			}
 		} else {
 			//Validate that our data tag is actually opening correctly

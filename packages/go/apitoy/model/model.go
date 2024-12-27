@@ -1,6 +1,24 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
+
+type SortDirection int
+
+const (
+	InvalidSortDirection SortDirection = iota
+	AscendingSortDirection
+	DescendingSortDirection
+)
+
+type SortItem struct {
+	Direction SortDirection
+	Column    string
+}
+
+type Sort []SortItem
 
 type FilterOperator string
 
@@ -64,17 +82,4 @@ type Filters map[string][]Filter
 
 type ValidFilters map[string][]FilterOperator
 
-type SortDirection int
-
-const (
-	InvalidSortDirection SortDirection = iota
-	AscendingSortDirection
-	DescendingSortDirection
-)
-
-type SortItem struct {
-	Direction SortDirection
-	Column    string
-}
-
-type Sort []SortItem
+type FileValidator func(src io.Reader, dst io.Writer) error
