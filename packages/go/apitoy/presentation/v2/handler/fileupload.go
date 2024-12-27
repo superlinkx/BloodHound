@@ -9,11 +9,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/specterops/bloodhound/headers"
 	"github.com/specterops/bloodhound/mediatypes"
+	"github.com/specterops/bloodhound/packages/go/apitoy/model"
 	"github.com/specterops/bloodhound/packages/go/apitoy/presentation/common"
 	"github.com/specterops/bloodhound/src/api"
 	"github.com/specterops/bloodhound/src/ctx"
-	"github.com/specterops/bloodhound/src/model"
-	"github.com/specterops/bloodhound/src/model/ingest"
 )
 
 const FileUploadJobIdPathParameterName = "file_upload_job_id"
@@ -45,7 +44,7 @@ func validateContentTypeForUpload(contentType string) model.FileType {
 		return model.FileTypeInvalid
 	} else if parsed == mediatypes.ApplicationJson.String() {
 		return model.FileTypeJson
-	} else if slices.Contains(ingest.AllowedZipFileUploadTypes, parsed) {
+	} else if slices.Contains(model.AllowedZipFileUploadTypes, parsed) {
 		return model.FileTypeZip
 	} else {
 		return model.FileTypeInvalid

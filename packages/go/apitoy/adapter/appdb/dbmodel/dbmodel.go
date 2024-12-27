@@ -1,15 +1,53 @@
 package dbmodel
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/specterops/bloodhound/packages/go/apitoy/model"
 )
 
 type SQLFilter struct {
 	SQLString string
 	Params    []any
+}
+
+// Basic is a struct which includes the following basic fields: CreatedAt, UpdatedAt, DeletedAt.
+type Basic struct {
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt sql.NullTime `gorm:"-"`
+}
+
+// Unique is a struct is a struct which includes the following basic fields: ID, CreatedAt, UpdatedAt, DeletedAt.
+type Unique struct {
+	ID uuid.UUID `gorm:"primaryKey"`
+
+	Basic
+}
+
+// Serial is a struct which includes the following basic fields: ID, CreatedAt, UpdatedAt, DeletedAt.
+// This was chosen over the default gorm model so that ID retains the bare int type. We do this because
+// uint has no meaning with regards to the underlying database storage engine - at least where postgresql is
+// concerned. To avoid type gnashing and unexpected pain with sql.NullInt32 the bare int type is a better
+// choice all around.
+//
+// See: https://www.postgresql.org/docs/current/datatype-numeric.html
+type Serial struct {
+	ID int32 `gorm:"primaryKey"`
+
+	Basic
+}
+
+// BigSerial is a struct that follows the same design principles as Serial but with one exception:
+// the ID type is set to int64 to support an ID sequence limit of up to 9223372036854775807.
+type BigSerial struct {
+	ID int64 `gorm:"primaryKey"`
+
+	Basic
 }
 
 func BuildSQLFilter(filters model.Filters) (SQLFilter, error) {
