@@ -25,6 +25,9 @@ import (
 	"github.com/specterops/bloodhound/dawgs/graph"
 	schema "github.com/specterops/bloodhound/graphschema"
 	"github.com/specterops/bloodhound/log"
+	"github.com/specterops/bloodhound/packages/go/apitoy/adapter/appdb"
+	"github.com/specterops/bloodhound/packages/go/apitoy/adapter/file"
+	"github.com/specterops/bloodhound/packages/go/apitoy/app"
 	"github.com/specterops/bloodhound/src/api"
 	"github.com/specterops/bloodhound/src/api/registration"
 	"github.com/specterops/bloodhound/src/api/router"
@@ -42,11 +45,11 @@ import (
 )
 
 // ConnectPostgres initializes a connection to PG, and returns errors if any
-func ConnectPostgres(cfg config.Configuration) (*database.BloodhoundDB, error) {
+func ConnectPostgres(cfg config.Configuration) (*database.BloodhoundDB, appdb.Adapter, error) {
 	if db, err := database.OpenDatabase(cfg.Database.PostgreSQLConnectionString()); err != nil {
-		return nil, fmt.Errorf("error while attempting to create database connection: %w", err)
+		return nil, appdb.Adapter{}, fmt.Errorf("error while attempting to create database connection: %w", err)
 	} else {
-		return database.NewBloodhoundDB(db, auth.NewIdentityResolver()), nil
+		return database.NewBloodhoundDB(db, auth.NewIdentityResolver()), appdb.NewAdapter(db), nil
 	}
 }
 
@@ -54,11 +57,12 @@ func ConnectPostgres(cfg config.Configuration) (*database.BloodhoundDB, error) {
 func ConnectDatabases(ctx context.Context, cfg config.Configuration) (bootstrap.DatabaseConnections[*database.BloodhoundDB, *graph.DatabaseSwitch], error) {
 	connections := bootstrap.DatabaseConnections[*database.BloodhoundDB, *graph.DatabaseSwitch]{}
 
-	if db, err := ConnectPostgres(cfg); err != nil {
+	if db, appdbAdapter, err := ConnectPostgres(cfg); err != nil {
 		return connections, err
 	} else if graphDB, err := bootstrap.ConnectGraph(ctx, cfg); err != nil {
 		return connections, err
 	} else {
+		connections.AppdbAdapter = appdbAdapter
 		connections.RDMS = db
 		connections.Graph = graphDB
 
@@ -100,10 +104,14 @@ func Entrypoint(ctx context.Context, cfg config.Configuration, connections boots
 			routerInst     = router.NewRouter(cfg, authorizer, bootstrap.ContentSecurityPolicy)
 			ctxInitializer = database.NewContextInitializer(connections.RDMS)
 			authenticator  = api.NewAuthenticator(cfg, connections.RDMS, ctxInitializer)
+			fileAdapter    = file.NewAdapter(cfg.TempDirectory())
+			bhApp          = app.NewBHApp(connections.AppdbAdapter, fileAdapter, cfg)
 		)
 
+		// new app
+
 		registration.RegisterFossGlobalMiddleware(&routerInst, cfg, auth.NewIdentityResolver(), authenticator)
-		registration.RegisterFossRoutes(&routerInst, cfg, connections.RDMS, connections.Graph, graphQuery, apiCache, collectorManifests, authenticator, authorizer)
+		registration.RegisterFossRoutes(&routerInst, cfg, connections.RDMS, connections.Graph, graphQuery, apiCache, collectorManifests, authenticator, authorizer, bhApp)
 
 		// Set neo4j batch and flush sizes
 		neo4jParameters := appcfg.GetNeo4jParameters(ctx, connections.RDMS)
