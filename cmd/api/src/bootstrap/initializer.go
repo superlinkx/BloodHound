@@ -22,14 +22,16 @@ import (
 
 	"github.com/specterops/bloodhound/dawgs/graph"
 	"github.com/specterops/bloodhound/log"
+	"github.com/specterops/bloodhound/packages/go/apitoy/adapter/appdb"
 	"github.com/specterops/bloodhound/src/config"
 	"github.com/specterops/bloodhound/src/daemons"
 	"github.com/specterops/bloodhound/src/database"
 )
 
 type DatabaseConnections[DBType database.Database, GraphType graph.Database] struct {
-	RDMS  DBType
-	Graph GraphType
+	AppdbAdapter appdb.Adapter
+	RDMS         DBType
+	Graph        GraphType
 }
 
 type DatabaseConstructor[DBType database.Database, GraphType graph.Database] func(ctx context.Context, cfg config.Configuration) (DatabaseConnections[DBType, GraphType], error)

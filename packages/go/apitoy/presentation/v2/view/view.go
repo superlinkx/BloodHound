@@ -1,7 +1,6 @@
 package view
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -9,17 +8,16 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
-	appModel "github.com/specterops/bloodhound/packages/go/apitoy/model"
-	"github.com/specterops/bloodhound/src/model"
+	"github.com/specterops/bloodhound/packages/go/apitoy/model"
 )
 
 var filterRegex = regexp.MustCompile(`([~\w]+):([\w\--_ ]+)`)
 
 // Basic is a struct which includes the following basic fields: CreatedAt, UpdatedAt, DeletedAt.
 type Basic struct {
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
-	DeletedAt sql.NullTime `json:"deleted_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	DeletedAt time.Time `json:"deleted_at"`
 }
 
 // Unique is a struct is a struct which includes the following basic fields: ID, CreatedAt, UpdatedAt, DeletedAt.
@@ -58,16 +56,16 @@ type PaginatedResponse struct {
 	Data  any `json:"data"`
 }
 
-func ValidSort(requestColumns []string, sortableColumns []string) (appModel.Sort, error) {
-	var sort = make(appModel.Sort, 0, len(requestColumns))
+func ValidSort(requestColumns []string, sortableColumns []string) (model.Sort, error) {
+	var sort = make(model.Sort, 0, len(requestColumns))
 
 	for _, column := range requestColumns {
-		var sortItem appModel.SortItem
+		var sortItem model.SortItem
 		if string(column[0]) == "-" {
-			sortItem.Direction = appModel.DescendingSortDirection
+			sortItem.Direction = model.DescendingSortDirection
 			sortItem.Column = column[1:]
 		} else {
-			sortItem.Direction = appModel.AscendingSortDirection
+			sortItem.Direction = model.AscendingSortDirection
 			sortItem.Column = column
 		}
 
@@ -81,8 +79,8 @@ func ValidSort(requestColumns []string, sortableColumns []string) (appModel.Sort
 	return sort, nil
 }
 
-func GetValidFiltersFromQuery(queryParams map[string][]string, validFilters appModel.ValidFilters) (appModel.Filters, error) {
-	filters := make(appModel.Filters)
+func GetValidFiltersFromQuery(queryParams map[string][]string, validFilters model.ValidFilters) (model.Filters, error) {
+	filters := make(model.Filters)
 
 	for name, values := range queryParams {
 		// ignore pagination query params
@@ -99,16 +97,16 @@ func GetValidFiltersFromQuery(queryParams map[string][]string, validFilters appM
 		} else {
 			for _, value := range values {
 				if subgroups := filterRegex.FindStringSubmatch(value); len(subgroups) > 0 {
-					if filterPredicate, err := appModel.ParseFilterOperator(subgroups[1]); err != nil {
+					if filterPredicate, err := model.ParseFilterOperator(subgroups[1]); err != nil {
 						return filters, err
 					} else if !slices.Contains(validPredicates, filterPredicate) {
 						return filters, errors.New("invalid filter predicate")
 					} else {
 						if _, ok := filters[name]; !ok {
-							filters[name] = make([]appModel.Filter, 0, 4)
+							filters[name] = make([]model.Filter, 0, 4)
 						}
 
-						filters[name] = append(filters[name], appModel.Filter{
+						filters[name] = append(filters[name], model.Filter{
 							Operator: filterPredicate,
 							Value:    subgroups[2],
 						})
